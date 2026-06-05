@@ -1,11 +1,6 @@
 services:
   whisper-cpp:
-    build:
-      context: ./whisper-cpp
-      args:
-        - WHISPER_CPP_VERSION=${WHISPER_CPP_VERSION:-1.7.4}
-        - BUILD_FROM=intel/oneapi:2025.0.1-0-devel-ubuntu24.04
-    image: ghcr.io/${GITHUB_REPOSITORY:-local/wyoming-whisper-intel-gpu}/whisper-cpp:latest
+    image: ghcr.io/querdenker2k/wyoming-whisper-intel-gpu/whisper-cpp:latest
     restart: unless-stopped
     depends_on:
       model-download:
@@ -39,11 +34,7 @@ services:
       --prompt "${WHISPER_PROMPT}"
 
   wyoming-api:
-    build:
-      context: ./wyoming-api
-      args:
-        - BUILD_FROM=debian:bookworm-slim
-    image: ghcr.io/${GITHUB_REPOSITORY:-local/wyoming-whisper-intel-gpu}/wyoming-api:latest
+    image: ghcr.io/querdenker2k/wyoming-whisper-intel-gpu/wyoming-api:latest
     restart: unless-stopped
     depends_on:
       whisper-cpp:
@@ -63,6 +54,9 @@ services:
       --initial-prompt "${WHISPER_PROMPT}"
 
   model-download:
+    # Build locally: docker compose build model-download
+    # The model file must exist at $MODELS_DIR/ggml-$WHISPER_MODEL.bin
+    # before whisper-cpp starts. See README for download instructions.
     build:
       context: ./model-download
     security_opt:
