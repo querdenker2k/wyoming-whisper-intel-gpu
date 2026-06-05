@@ -1,0 +1,84 @@
+services:
+  whisper-cpp:
+    build:
+      context: ./whisper-cpp
+      args:
+        - WHISPER_CPP_VERSION=${WHISPER_CPP_VERSION:-1.7.4}
+        - BUILD_FROM=intel/oneapi:2025.0.1-0-devel-ubuntu24.04
+    image: ghcr.io/${GITHUB_REPOSITORY:-local/wyoming-whisper-intel-gpu}/whisper-cpp:latest
+    restart: unless-stopped
+    depends_on:
+      model-download:
+        condition: service_completed_successfully
+    user: "${UID:-0}:${GID:-0}"
+    group_add:
+      - "${RENDER_GROUP_ID:-109}"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: bind
+        source: ${MODELS_DIR:-./models}
+        target: /models
+    networks:
+      - whisper
+    hostname: whispercpp
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - SYCL_CACHE_PERSISTENT=1
+      - SYCL_CACHE_DIR=/models/sycl_cache
+      - SYCL_DEVICE_ALLOWLIST=BackendName:level_zero
+    command: >
+      build/bin/whisper-server
+      -l ${WHISPER_LANG}
+      -bs ${WHISPER_BEAM_SIZE}
+      -m /models/ggml-${WHISPER_MODEL}.bin
+      --host 0.0.0.0 --port 8910
+      --suppress-nst
+      --audio-ctx ${WHISPER_AUDIO_CTX:-768}
+      --prompt "${WHISPER_PROMPT}"
+
+  wyoming-api:
+    build:
+      context: ./wyoming-api
+      args:
+        - BUILD_FROM=debian:bookworm-slim
+    image: ghcr.io/${GITHUB_REPOSITORY:-local/wyoming-whisper-intel-gpu}/wyoming-api:latest
+    restart: unless-stopped
+    depends_on:
+      whisper-cpp:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    user: "${UID:-0}:${GID:-0}"
+    networks:
+      - whisper
+      - wyoming-net
+    ports:
+      - "${WYOMING_PORT:-10300}:7891"
+    command: >
+      script/run
+      --uri tcp://0.0.0.0:7891
+      --api http://whispercpp:8910/inference
+      --initial-prompt "${WHISPER_PROMPT}"
+
+  model-download:
+    build:
+      context: ./model-download
+    security_opt:
+      - no-new-privileges:true
+    user: "${UID:-0}:${GID:-0}"
+    volumes:
+      - type: bind
+        source: ${MODELS_DIR:-./models}
+        target: /models
+    restart: no
+    networks:
+      - whisper
+    environment:
+      - MODEL=${WHISPER_MODEL}
+
+networks:
+  whisper: {}
+  wyoming-net:
+    external: true
