@@ -33,6 +33,8 @@ Home Assistant / App
 docker network create wyoming-net
 ```
 
+> If you already have an existing Docker network (e.g. a Swarm overlay `swarm-net`), create a separate bridge network named `wyoming-net` — attaching standalone Compose containers to Swarm overlay networks is unreliable.
+
 ### 2. Configure
 
 ```bash
